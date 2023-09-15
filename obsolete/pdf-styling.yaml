@@ -1,0 +1,21 @@
+---
+author:
+ - Jonathan M. Spring
+ - Eric Hatleback
+ - Allen D. Householder
+ - Vijay S. Sarvepalli
+ - Laurie Tyzenhaus
+ - Charles G. Yarbrough
+documentclass: report
+classoption:
+ - 10pt
+ - letterpaper
+ - onecolumn
+ - notitlepage
+pagestyle: headings
+numbersections: true
+secnumdepth: 4
+geometry:
+ - top=1in
+ - bottom=1in
+...
