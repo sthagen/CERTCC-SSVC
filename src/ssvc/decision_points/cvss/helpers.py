@@ -27,13 +27,16 @@ import semver
 
 from ssvc.decision_points.base import DecisionPointValue
 from ssvc.decision_points.cvss._not_defined import NOT_DEFINED_X
-from ssvc.decision_points.cvss.base import CvssDecisionPoint, CvssDecisionPoint as DecisionPoint
+from ssvc.decision_points.cvss.base import (
+    CvssDecisionPoint,
+    CvssDecisionPoint as DecisionPoint,
+)
 
 
 def _modify_3(dp: DecisionPoint):
     _dp_dict = deepcopy(dp.model_dump())
-    _dp_dict["name"] = f"Modified {_dp_dict["name"]}"
-    _dp_dict["key"] = f"M{_dp_dict["key"]}"
+    _dp_dict["name"] = f'Modified {_dp_dict["name"]}'
+    _dp_dict["key"] = f'M{_dp_dict["key"]}'
 
     # if there is no value named "Not Defined" value, add it
     nd = NOT_DEFINED_X
@@ -94,7 +97,9 @@ def _modify_4(dp: DecisionPoint):
         for v in _dp_dict["values"]:
             if v["key"] == "N":
                 v["name"] = "Negligible"
-                v["description"] = v["description"].replace(" no ", " negligible ")
+                v["description"] = v["description"].replace(
+                    " no ", " negligible "
+                )
                 # we need to bump the version for this change
                 version = _dp_dict["version"]
                 ver = semver.Version.parse(version)
