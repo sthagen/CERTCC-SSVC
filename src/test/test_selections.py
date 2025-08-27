@@ -72,7 +72,8 @@ class MyTestCase(unittest.TestCase):
         self.assertIsInstance(self.s1.version, str)
         self.assertRegex(
             self.s1.version,
-            VERSION_PATTERN,
+            # enable re.ASCII so that `\d` is interpreted like in Javascript
+            "(?a:" + VERSION_PATTERN + ")",
             "Version does not match the required pattern",
         )
 
@@ -280,6 +281,15 @@ class MyTestCase(unittest.TestCase):
                 selections=[self.s1],
                 timestamp=datetime.now(),
                 target_ids=[123],  # Invalid: not a string
+            )
+
+        # Test invalid target_ids (duplicate items)
+        with self.assertRaises(ValueError):
+            SelectionList(
+                selections=[self.s1],
+                timestamp=datetime.now(),
+                # Invalid: due to duplicates
+                target_ids=["CVE-1900-1234","CVE-1900-1234"],
             )
 
     def test_add_selection_method(self):
