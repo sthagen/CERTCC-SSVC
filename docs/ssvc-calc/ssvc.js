@@ -20,7 +20,7 @@
  */
 
 /* SSVC code for graph building */
-const _version = "6.0.2"
+const _version = "6.1.1"
 const _tool = "Dryad SSVC Calculator "+_version
 var showFullTree = false;
 /* The registryurl is now relative to local folder using symlink for convenience*/
@@ -116,10 +116,23 @@ function arrayReduce(arr,n) {
 $(function () {
     /* document.ready() */
     reset_form();
+    let displayTree = "Deployer Patch Application Priority";
+    let query = "";
+    try {
+        query = (window.top && window.top !== window.self)
+            ? (window.top.location.search || window.top.location.hash.substring(1))
+            : "";
+    } catch (e) {
+        query = "";
+    }
+    query = query || window.location.search || window.location.hash.substring(1);
+    const urlParams = Object.fromEntries(new URLSearchParams(query));
+    const treeParam = urlParams.defaultTree || urlParams.displayTree || urlParams.display || urlParams.tree;
+    if (treeParam) displayTree = treeParam;
     $('#topalert').width($('main').width());
     window.onresize = function() { $('#topalert').width($('main').width())}
     $.getJSON(registry_url).done(function(registry) {
-	let defaultTree;
+	let displayTreeObj;
 	if (registry.types && registry.types.DecisionPoint &&
 	    registry.types.DecisionPoint.namespaces) {
 	    const namespaces = registry.types.DecisionPoint.namespaces;
@@ -154,9 +167,9 @@ $(function () {
 				const versionEntry = keyEntry.versions[version];
 				if (versionEntry.obj && versionEntry.obj.decision_points) {
 				    let mdata = {data : versionEntry.obj, displayname: versionEntry.obj.name + " (" + versionEntry.obj.version + ")"};
-				    if(versionEntry.obj.name.indexOf("Deployer") > -1) {
+				    if(versionEntry.obj.name.indexOf(displayTree) > -1) {
 					mdata['selected'] = true;
-					defaultTree = versionEntry.obj;
+					displayTreeObj = versionEntry.obj;
 				    }
 				    SSVC.decision_trees.push(mdata);
 				}
@@ -166,7 +179,16 @@ $(function () {
 		}
 	    }
 	}
-	parse_json(defaultTree);
+	if (!displayTreeObj) {
+	    if (SSVC.decision_trees.length === 0) {
+		topalert("No decision trees found in registry","danger");
+		return;
+	    }
+	    SSVC.decision_trees[0].selected = true;
+	    console.warn("Warning: no matching decision tree found; loading the first one");
+	    displayTreeObj = SSVC.decision_trees[0].data;
+	}
+	parse_json(displayTreeObj);
 	SSVC.decision_trees.forEach(function(dpd, i) {
 	    $('#tree_samples').append($('<option>')
 				      .attr({value: i, selected: dpd.selected})
@@ -896,41 +918,35 @@ function check_select(ev) {
 	    outcome_set(dinput, true);
 	}
     });
-    const finddpIndex = $(input).data("dpdepth");
-    const nodes = d3.selectAll("g.node.depth-"+String(finddpIndex));
-    function traverse_remove(xnode) {
-	if(!xnode.__data__) {
-	    console.log("Error no nodes to descend!");
+    /* Re-prune the whole tree from the state of every checkbox, walking the
+       saved _schildren rather than the rendered nodes, so boxes can be
+       toggled in any order and hidden branches stay in sync. */
+    let unchecked = {};
+    groupContainer.querySelectorAll('input[type="checkbox"].dp_input').forEach(function(xinput) {
+	if(!xinput.checked) {
+	    const dpdepth = parseInt($(xinput).data("dpdepth"));
+	    if(!(dpdepth in unchecked))
+		unchecked[dpdepth] = [];
+	    unchecked[dpdepth].push(parseInt($(xinput).data("dpvdepth")));
 	}
-	if(!xnode.__data__._schildren) {
-	    console.log("Error no node _schildren data to restore from!");
+    });
+    function prune_tree(xnode, depth) {
+	if(!xnode._schildren) {
+	    if((!xnode.children) || (!xnode.children.length))
+		return;
+	    xnode._schildren = Array.from(xnode.children);
 	}
-	let removeValues = [];
-	xnode.__data__.children = Array.from(xnode.__data__._schildren);
-	dpContainer.querySelectorAll("input").forEach(function(cinput) {
-	    if(!cinput.checked) 
-		removeValues.push($(cinput).data("dpvdepth"));
+	const removeValues = unchecked[depth] || [];
+	xnode.children = xnode._schildren.filter(function(_, vindex) {
+	    return !removeValues.includes(vindex);
 	});
-	removeValues.reverse().forEach(function(rindex) {
-	    removevalueIndex = parseInt(rindex);
-	    xnode.__data__.children.splice(removevalueIndex,1);
+	xnode._schildren.forEach(function(child) {
+	    prune_tree(child, depth + 1);
 	});
-	update(xnode.__data__);
-    }    
-    
-    if(nodes.length) {
-	nodes[0].forEach(function(xnode) {
-	    if(xnode.__data__) {
-		if(xnode.__data__._schildren) {
-		    traverse_remove(xnode);
-		} else if(xnode.__data__.children) {
-		    let removevalueIndex = $(input).data("dpvdepth");
-		    xnode.__data__._schildren = Array.from(xnode.__data__.children);
-		    xnode.__data__.children.splice(removevalueIndex,1);
-		    update(xnode.__data__);
-		}
-	    }
-	});
+    }
+    if(root && $("svg.mgraph").length) {
+	prune_tree(root, 0);
+	update(root);
     }
 }
 function process_ssvc(ssvc, winput) {
